@@ -1,23 +1,25 @@
 // 开源项目，未经作者同意，不得以抄袭/复制代码/修改源代码版权信息。
 // Copyright @ 2018-present xiejiahe. All rights reserved.
 
-import { Component, Input } from '@angular/core'
+import { Component, Input, ViewChild, ElementRef } from '@angular/core'
 import { CommonModule } from '@angular/common'
 import { FormsModule } from '@angular/forms'
 import {
   getDefaultSearchEngine,
   setDefaultSearchEngine,
   queryString,
-} from '../../utils'
+} from 'src/utils'
 import { Router } from '@angular/router'
 import { searchEngineList } from 'src/store'
-import { ISearchEngineProps } from '../../types'
+import { ISearchProps } from 'src/types'
 import { SearchType } from './index'
 import { $t } from 'src/locale'
 import { NzInputModule } from 'ng-zorro-antd/input'
 import { NzPopoverModule } from 'ng-zorro-antd/popover'
 import { NzSelectModule } from 'ng-zorro-antd/select'
 import { LogoComponent } from 'src/components/logo/logo.component'
+import { isLogin } from 'src/utils/user'
+import event from 'src/utils/mitt'
 
 @Component({
   standalone: true,
@@ -29,29 +31,33 @@ import { LogoComponent } from 'src/components/logo/logo.component'
     LogoComponent,
     NzSelectModule,
   ],
-  selector: 'app-search-engine',
-  templateUrl: './search-engine.component.html',
-  styleUrls: ['./search-engine.component.scss'],
+  selector: 'app-search',
+  templateUrl: './index.component.html',
+  styleUrls: ['./index.component.scss'],
 })
-export class SearchEngineComponent {
+export class SearchComponent {
+  @ViewChild('input', { static: false }) input!: ElementRef
   @Input() size: 'small' | 'default' | 'large' = 'default'
 
-  $t = $t
-  searchEngineList: ISearchEngineProps[] = searchEngineList
-  currentEngine: ISearchEngineProps = getDefaultSearchEngine()
-  SearchType = SearchType
-  searchTypeValue = SearchType.All
+  readonly $t = $t
+  readonly isLogin = isLogin
+  readonly SearchType = SearchType
+  readonly searchEngineList: ISearchProps[] = searchEngineList.filter(
+    (item) => !item.blocked
+  )
+  currentEngine: ISearchProps = getDefaultSearchEngine()
+  searchTypeValue = Number(queryString()['type']) || SearchType.All
   keyword = queryString().q
 
-  constructor(private router: Router) {}
-
-  get searchList() {
-    return this.searchEngineList.filter((item) => !item.blocked)
+  constructor(private router: Router) {
+    event.on('SEARCH_FOCUS', () => {
+      this.inputFocus()
+    })
   }
 
-  inputFocus() {
+  private inputFocus() {
     setTimeout(() => {
-      document.getElementById('search-engine-input')?.focus?.()
+      this.input?.nativeElement?.focus()
     }, 100)
   }
 
@@ -59,9 +65,13 @@ export class SearchEngineComponent {
     this.inputFocus()
   }
 
+  onSelectChange() {
+    this.inputFocus()
+  }
+
   clickEngineItem(index: number) {
     document.body.click()
-    this.currentEngine = this.searchList[index]
+    this.currentEngine = this.searchEngineList[index]
     this.inputFocus()
     setDefaultSearchEngine(this.currentEngine)
   }
@@ -78,6 +88,7 @@ export class SearchEngineComponent {
         ...params,
         q: this.keyword,
         type: this.searchTypeValue,
+        _: Date.now(),
       },
     })
   }

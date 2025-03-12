@@ -1,7 +1,8 @@
 <div
   class="card-container progrcode"
-  *ngIf="dataSource.desc && dataSource.desc[0] === '!'; else other"
-  [innerHTML]="html | safeHtml"
+  *ngIf="isCode; else other"
+  [innerHTML]="description | safeHtml"
+  #root
 ></div>
 
 <ng-template #other>
@@ -21,7 +22,7 @@
 
       <div
         class="breadcrumb1 ellipsis"
-        *ngIf="searchKeyword && dataSource?.breadcrumb"
+        *ngIf="commonService.searchKeyword && dataSource?.breadcrumb"
       >
         <span *ngFor="let n of dataSource.breadcrumb; let idx = index"
           >{{ n
@@ -85,7 +86,7 @@
         ></div>
         <div
           class="action-item dark-border-color"
-          *ngIf="isLogin"
+          *ngIf="isLogin || permissions.edit"
           nz-tooltip
           [nzTooltipTitle]="$t('_edit')"
           nz-icon
@@ -95,7 +96,7 @@
         ></div>
         <div
           class="action-item dark-border-color"
-          *ngIf="isLogin && indexs.length === 4"
+          *ngIf="isLogin"
           nz-tooltip
           [nzTooltipTitle]="$t('_move')"
           nz-icon
@@ -105,7 +106,7 @@
         ></div>
         <div
           class="action-item dark-border-color"
-          *ngIf="isLogin"
+          *ngIf="isLogin || permissions.del"
           nz-popconfirm
           nzPopconfirmPlacement="rightTop"
           nzOkType="danger"
@@ -137,7 +138,7 @@
 
       <div
         class="breadcrumb1 ellipsis"
-        *ngIf="searchKeyword && dataSource?.breadcrumb"
+        *ngIf="commonService.searchKeyword && dataSource?.breadcrumb"
       >
         <span *ngFor="let n of dataSource.breadcrumb; let idx = index"
           >{{ n
@@ -181,7 +182,7 @@
 
       <div
         class="breadcrumb1 ellipsis"
-        *ngIf="searchKeyword && dataSource?.breadcrumb"
+        *ngIf="commonService.searchKeyword && dataSource?.breadcrumb"
       >
         <span *ngFor="let n of dataSource.breadcrumb; let idx = index"
           >{{ n
@@ -218,7 +219,12 @@
           (click)="jumpService.goUrl($event, dataSource.url)"
           class="cursor-pointer"
         >
-          <div class="top dark-border-color">
+          <div
+            class="top dark-border-color"
+            [class.border-transparent]="
+              !dataSource.desc && !dataSource.tags.length
+            "
+          >
             <app-logo
               [src]="dataSource.icon || ''"
               [name]="dataSource.name"
@@ -230,7 +236,7 @@
               [innerHTML]="dataSource.name"
             ></div>
           </div>
-          <div class="px-2.5 pb-2.5">
+          <div class="p-2.5">
             <div
               class="desc ellipsis3 dark-white"
               *ngIf="dataSource.desc"
@@ -238,8 +244,17 @@
               [innerHTML]="dataSource.desc"
             ></div>
             <tag-list
-              *ngIf="dataSource.tags?.length"
+              *ngIf="
+                dataSource.tags?.length ||
+                isLogin ||
+                permissions.edit ||
+                permissions.del
+              "
               [data]="dataSource.tags"
+              [action]="true"
+              (onDelete)="confirmDel()"
+              (onEdit)="openEditWebMoal()"
+              (onMove)="openMoveWebModal()"
             />
           </div>
         </div>
@@ -262,7 +277,7 @@
 
       <div
         class="breadcrumb1 ellipsis"
-        *ngIf="searchKeyword && dataSource?.breadcrumb"
+        *ngIf="commonService.searchKeyword && dataSource?.breadcrumb"
       >
         <span *ngFor="let n of dataSource.breadcrumb; let idx = index"
           >{{ n
@@ -297,32 +312,19 @@
 
       <div class="bottom-bar">
         <div class="rate2" *ngIf="settings.showRate">{{ getRate }}</div>
-        <tag-list [data]="dataSource.tags" *ngIf="dataSource.tags?.length" />
-
-        <div class="actions" *ngIf="isLogin">
-          <span
-            class="action-btn dark-text dark-hover-text"
-            (click)="openEditWebMoal()"
-            >{{ $t('_edit') }}</span
-          >
-          <span
-            class="action-btn dark-text dark-hover-text"
-            (click)="openMoveWebModal()"
-            *ngIf="indexs.length === 4"
-            >{{ $t('_move') }}</span
-          >
-
-          <span
-            nz-popconfirm
-            nzPopconfirmPlacement="rightTop"
-            nzOkType="danger"
-            [nzPopconfirmTitle]="$t('_confirmDel')"
-            nzPopconfirmPlacement="bottom"
-            (nzOnConfirm)="confirmDel()"
-            class="action-btn dark-text dark-hover-text"
-            >{{ $t('_del') }}</span
-          >
-        </div>
+        <tag-list
+          [data]="dataSource.tags"
+          *ngIf="
+            dataSource.tags?.length ||
+            isLogin ||
+            permissions.edit ||
+            permissions.del
+          "
+          [action]="true"
+          (onDelete)="confirmDel()"
+          (onEdit)="openEditWebMoal()"
+          (onMove)="openMoveWebModal()"
+        />
       </div>
     </div>
   </ng-container>

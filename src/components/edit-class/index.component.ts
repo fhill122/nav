@@ -2,7 +2,13 @@
 // Copyright @ 2018-present xiejiahe. All rights reserved.
 // See https://github.com/xjh22222228/nav
 
-import { Component, Input, Output, EventEmitter } from '@angular/core'
+import {
+  Component,
+  Output,
+  EventEmitter,
+  ViewChild,
+  ElementRef,
+} from '@angular/core'
 import { CommonModule } from '@angular/common'
 import {
   FormsModule,
@@ -11,7 +17,6 @@ import {
   FormGroup,
   Validators,
 } from '@angular/forms'
-import { Router } from '@angular/router'
 import { NzModalModule } from 'ng-zorro-antd/modal'
 import { NzFormModule } from 'ng-zorro-antd/form'
 import { NzInputModule } from 'ng-zorro-antd/input'
@@ -22,7 +27,8 @@ import { $t } from 'src/locale'
 import { NzMessageService } from 'ng-zorro-antd/message'
 import { websiteList } from 'src/store'
 import { setWebsiteList } from 'src/utils/web'
-import { queryString } from 'src/utils/index'
+import { getClassById } from 'src/utils/index'
+import { getTempId, isSelfDevelop } from 'src/utils/utils'
 import event from 'src/utils/mitt'
 
 @Component({
@@ -38,58 +44,50 @@ import event from 'src/utils/mitt'
     FormsModule,
     ReactiveFormsModule,
   ],
-  selector: 'edit-category',
+  selector: 'edit-class',
   templateUrl: './index.component.html',
   styleUrls: ['./index.component.scss'],
 })
-export class EditCategoryComponent {
+export class EditClassComponent {
   @Output() onOk = new EventEmitter()
-  @Input() title: string = $t('_edit')
-  @Input() app: boolean = false
+  @ViewChild('input', { static: false }) input!: ElementRef
 
   $t = $t
   validateForm!: FormGroup
   showModal = false
-  index = 0
+  isEdit = false
 
-  constructor(
-    private fb: FormBuilder,
-    private message: NzMessageService,
-    private router: Router
-  ) {
+  constructor(private fb: FormBuilder, private message: NzMessageService) {
     this.validateForm = this.fb.group({
       title: ['', [Validators.required]],
       icon: [''],
       ownVisible: [false],
+      id: [-1],
     })
     const handleOpen = (props: any = {}) => {
-      if (this.isSystemPage()) {
-        return
-      }
+      this.isEdit = !!props['title']
       this.validateForm.get('title')!.setValue(props['title'] || '')
       this.validateForm.get('icon')!.setValue(props['icon'] || '')
+      this.validateForm.get('id')!.setValue(props['id'] || getTempId())
       this.validateForm.get('ownVisible')!.setValue(!!props['ownVisible'])
-      this.index = props['index'] || 0
       this.showModal = true
+      this.focusUrl()
     }
-    event.on('EDIT_CATEGORY_OPEN', handleOpen)
+    event.on('EDIT_CLASS_OPEN', handleOpen)
   }
 
   get iconUrl(): string {
     return this.validateForm.get('icon')?.value || ''
   }
 
-  onChangeFile(data: any) {
-    this.validateForm.get('icon')!.setValue(data.cdn)
+  focusUrl() {
+    setTimeout(() => {
+      this.input?.nativeElement?.focus()
+    }, 400)
   }
 
-  isSystemPage(): boolean {
-    if (this.app) {
-      if (this.router.url.includes('system')) {
-        return true
-      }
-    }
-    return false
+  onChangeFile(data: any) {
+    this.validateForm.get('icon')!.setValue(data.cdn)
   }
 
   onCancel() {
@@ -98,31 +96,59 @@ export class EditCategoryComponent {
   }
 
   handleOk() {
-    let { title, icon, ownVisible } = this.validateForm.value
+    let { title, icon, ownVisible, id } = this.validateForm.value
     if (!title || !title.trim()) {
       this.message.error('Cannot be empty')
       return
     }
     title = title.trim()
-    const params = {
+    const params: Record<string, any> = {
+      id,
       title,
       icon,
       ownVisible,
     }
-    this.onOk.emit(params)
-    this.onCancel()
 
     try {
-      if (this.app) {
-        const { page, id } = queryString()
-        websiteList[page].nav[id].nav[this.index] = {
-          ...websiteList[page].nav[id].nav[this.index],
-          ...params,
+      if (this.isEdit) {
+        const { oneIndex, twoIndex, threeIndex } = getClassById(id, -1)
+        if (threeIndex !== -1) {
+          websiteList[oneIndex].nav[twoIndex].nav[threeIndex] = {
+            ...websiteList[oneIndex].nav[twoIndex].nav[threeIndex],
+            ...params,
+          }
+        } else if (twoIndex !== -1) {
+          websiteList[oneIndex].nav[twoIndex] = {
+            ...websiteList[oneIndex].nav[twoIndex],
+            ...params,
+          }
+        } else {
+          websiteList[oneIndex] = {
+            ...websiteList[oneIndex],
+            ...params,
+          }
         }
-        setWebsiteList(websiteList)
+      } else {
+        params['id'] = getTempId()
+        params['nav'] = []
+        const { oneIndex, twoIndex } = getClassById(id, -1)
+        if (twoIndex !== -1) {
+          websiteList[oneIndex].nav[twoIndex].nav.push(params as any)
+        } else if (oneIndex !== -1) {
+          websiteList[oneIndex].nav.push(params as any)
+        } else {
+          websiteList.push(params as any)
+        }
       }
+      setWebsiteList(websiteList)
     } catch (error: any) {
       this.message.error(error.message)
+    }
+
+    this.onOk.emit(params)
+    this.onCancel()
+    if (!isSelfDevelop) {
+      event.emit('WEB_REFRESH')
     }
   }
 }
